@@ -1,16 +1,19 @@
 #include <Arduino.h>
 
-#define LED_COUNT 5
+#define NUM_LEDS 5
 
-const uint8_t led_periods[LED_COUNT] = {1, 2, 3, 4, 5};
-volatile uint8_t led_counters[LED_COUNT] = {0};
+const uint8_t blink_periods[NUM_LEDS] = {1, 2, 3, 4, 5};
+volatile uint8_t period_counters[NUM_LEDS] = {0};
 
 void setup() {
     cli();
 
+    // Настройка порта B на вывод
     DDRB = DDRB | ((1 << DDB0) | (1 << DDB1) | (1 << DDB2) | (1 << DDB3) | (1 << DDB4));
+    // Начальное состояние - все светодиоды включены
     PORTB = PORTB | ((1 << PORTB0) | (1 << PORTB1) | (1 << PORTB2) | (1 << PORTB3) | (1 << PORTB4));
 
+    // Настройка Timer1 в режиме CTC
     TCCR1A = 0;
     TCCR1B = 0;
     TCNT1 = 0;
@@ -26,12 +29,12 @@ void setup() {
 }
 
 ISR(TIMER1_COMPA_vect) {
-    for (uint8_t i = 0; i < LED_COUNT; i++) {
-        led_counters[i]++;
+    for (uint8_t i = 0; i < NUM_LEDS; i++) {
+        period_counters[i]++;
 
-        if (led_counters[i] >= led_periods[i]) {
+        if (period_counters[i] >= blink_periods[i]) {
             PORTB = PORTB ^ (1 << i);
-            led_counters[i] = 0;
+            period_counters[i] = 0;
         }
     }
 }

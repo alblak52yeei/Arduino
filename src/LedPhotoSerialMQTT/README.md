@@ -1,10 +1,10 @@
-# Управление освещением с обменом данными по MQTT
+# Система управления освещением с использованием MQTT
 
 Проект представляет собой распределённую IoT-систему для управления освещением. Два микроконтроллера обмениваются данными через MQTT-брокер, используя Python-скрипты на ПК для связи по Serial.
 
 **Ссылка на Tinkercad:** [https://www.tinkercad.com/things/3lEG2WsQ2AY-ledphotoserialmqtt](https://www.tinkercad.com/things/3lEG2WsQ2AY-ledphotoserialmqtt)
 
-## Архитектура
+## Архитектура системы
 
 ```
 Sensor MCU (фоторезистор) ←UART→ PC1 (sensor_bridge.py) → MQTT Broker
@@ -14,7 +14,7 @@ Actuator MCU (LED) ←UART→ PC2 (actuator_bridge.py) ← MQTT Broker
                                                       Monitor (monitor.py)
 ```
 
-## Компоненты
+## Компоненты системы
 
 ### 1. Sensor MCU (`firmware/SensorMCU/SensorMCU.ino`)
 
@@ -26,8 +26,8 @@ Actuator MCU (LED) ←UART→ PC2 (actuator_bridge.py) ← MQTT Broker
 - `q` - остановить поток
 
 **Ответы:**
-- `SENSOR_VALUE:<значение>` - значение с датчика (0-1023)
-- `STREAM_STARTED` / `STREAM_STOPPED`
+- `PHOTO_VALUE:<значение>` - значение с датчика (0-1023)
+- `STREAM_ACTIVE` / `STREAM_INACTIVE`
 
 ### 2. Actuator MCU (`firmware/ActuatorMCU/ActuatorMCU.ino`)
 
@@ -39,7 +39,7 @@ Actuator MCU (LED) ←UART→ PC2 (actuator_bridge.py) ← MQTT Broker
 - `b` - мигать LED
 
 **Ответы:**
-- `LED_GOES_ON` / `LED_GOES_OFF` / `LED_WILL_BLINK`
+- `LED_ON` / `LED_OFF` / `LED_BLINK_MODE`
 
 ### 3. Sensor Bridge (`software/sensor_bridge.py`)
 
@@ -94,7 +94,7 @@ python software/sensor_bridge.py
 ## Логика работы
 
 1. Sensor Bridge каждые 2 секунды отправляет команду `p` на Sensor MCU
-2. Sensor MCU читает значение с фоторезистора и отправляет `SENSOR_VALUE:<value>`
+2. Sensor MCU читает значение с фоторезистора и отправляет `PHOTO_VALUE:<value>`
 3. Sensor Bridge публикует значение в MQTT топик `laboratory/greenhouse/luminosity`
 4. Actuator Bridge получает значение из MQTT
 5. Если значение < 500, отправляет команду `u` (включить), иначе `d` (выключить)
@@ -127,7 +127,7 @@ MCU-исполнитель мигает LED по команде `b`
 ## Структура проекта
 
 ```
-ShiftRegistrersTimers/
+LedPhotoSerialMQTT/
 ├── firmware/
 │   ├── SensorMCU/SensorMCU.ino
 │   └── ActuatorMCU/ActuatorMCU.ino

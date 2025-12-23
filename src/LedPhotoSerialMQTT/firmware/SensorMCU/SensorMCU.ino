@@ -1,11 +1,11 @@
-const int sensorPin = A0;
-bool isStreaming = false;
-unsigned long lastStreamTime = 0;
-const int streamInterval = 1000;
+const int photoPin = A0;
+bool streamEnabled = false;
+unsigned long lastReadTime = 0;
+const int readInterval = 1000;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(sensorPin, INPUT);
+  pinMode(photoPin, INPUT);
 }
 
 void loop() {
@@ -17,26 +17,26 @@ void loop() {
     }
 
     if (cmd == 'p') {
-      int val = analogRead(sensorPin);
-      Serial.print("SENSOR_VALUE:");
-      Serial.println(val);
+      int reading = analogRead(photoPin);
+      Serial.print("PHOTO_VALUE:");
+      Serial.println(reading);
     }
     else if (cmd == 's') {
-      isStreaming = true;
-      Serial.println("STREAM_STARTED");
+      streamEnabled = true;
+      Serial.println("STREAM_ACTIVE");
     }
     else if (cmd == 'q') {
-      isStreaming = false;
-      Serial.println("STREAM_STOPPED");
+      streamEnabled = false;
+      Serial.println("STREAM_INACTIVE");
     }
   }
 
-  if (isStreaming) {
-    if (millis() - lastStreamTime >= streamInterval) {
-      int val = analogRead(sensorPin);
-      Serial.print("SENSOR_VALUE:");
-      Serial.println(val);
-      lastStreamTime = millis();
+  if (streamEnabled) {
+    if (millis() - lastReadTime >= readInterval) {
+      int reading = analogRead(photoPin);
+      Serial.print("PHOTO_VALUE:");
+      Serial.println(reading);
+      lastReadTime = millis();
     }
   }
 }

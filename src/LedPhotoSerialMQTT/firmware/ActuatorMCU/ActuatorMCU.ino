@@ -1,43 +1,43 @@
 
-const int ledPin = 13;
-bool isBlinking = false;
-unsigned long lastBlinkTime = 0;
-bool ledState = LOW;
+const int ledOutput = 13;
+bool blinkMode = false;
+unsigned long previousBlink = 0;
+bool currentLedState = LOW;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(ledPin, OUTPUT);
+  pinMode(ledOutput, OUTPUT);
 }
 
 void loop() {
   if (Serial.available() > 0) {
-    char cmd = Serial.read();
+    char command = Serial.read();
 
     while(Serial.available() > 0 && (Serial.peek() == '\n' || Serial.peek() == '\r')) {
       Serial.read();
     }
 
-    if (cmd == 'u') {
-      isBlinking = false;
-      digitalWrite(ledPin, HIGH);
-      Serial.println("LED_GOES_ON");
+    if (command == 'u') {
+      blinkMode = false;
+      digitalWrite(ledOutput, HIGH);
+      Serial.println("LED_ON");
     }
-    else if (cmd == 'd') {
-      isBlinking = false;
-      digitalWrite(ledPin, LOW);
-      Serial.println("LED_GOES_OFF");
+    else if (command == 'd') {
+      blinkMode = false;
+      digitalWrite(ledOutput, LOW);
+      Serial.println("LED_OFF");
     }
-    else if (cmd == 'b') {
-      isBlinking = true;
-      Serial.println("LED_WILL_BLINK");
+    else if (command == 'b') {
+      blinkMode = true;
+      Serial.println("LED_BLINK_MODE");
     }
   }
 
-  if (isBlinking) {
-    if (millis() - lastBlinkTime >= 500) {
-      ledState = !ledState;
-      digitalWrite(ledPin, ledState);
-      lastBlinkTime = millis();
+  if (blinkMode) {
+    if (millis() - previousBlink >= 500) {
+      currentLedState = !currentLedState;
+      digitalWrite(ledOutput, currentLedState);
+      previousBlink = millis();
     }
   }
 }

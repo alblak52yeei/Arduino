@@ -5,7 +5,7 @@ int latchPin = 5;
 int clockPin = 3;
 int dataPin = 7;
 
-bool digits[10][8] = {
+bool segment_patterns[10][8] = {
   {1,1,0,1,1,1,0,1},
   {0,1,0,1,0,0,0,0},
   {1,1,0,0,1,1,1,0},
@@ -18,16 +18,16 @@ bool digits[10][8] = {
   {1,1,1,1,1,0,1,1}
 };
 
-volatile int internal_counter = 0;
-volatile int override_value = -1;
-volatile bool system_running = false;
+volatile int timer_counter = 0;
+volatile int next_value = -1;
+volatile bool is_active = false;
 
-volatile uint16_t shift_buffer = 0;
-volatile int bit_index = 15;
-volatile int ms_counter = 0;
+volatile uint16_t data_reg = 0;
+volatile int current_bit = 15;
+volatile int tick_counter = 0;
 
-enum State { STATE_WAIT, STATE_SHIFT, STATE_LATCH };
-volatile State current_state = STATE_WAIT;
+enum FsmState { IDLE, SENDING, UPDATING };
+volatile FsmState machine_state = IDLE;
 
 void setup() {
   pinMode(latchPin, OUTPUT);
@@ -38,7 +38,7 @@ void setup() {
   digitalWrite(latchPin, HIGH);
 
   Serial.begin(9600);
-  Serial.println(F("Send start value"));
+  Serial.println(F("Введите начальное значение"));
 
   cli();
   TCCR1A = 0;
@@ -53,86 +53,86 @@ void setup() {
 }
 
 void loop() {
-  static char input_buf[3];
-  static byte pos = 0;
+  static char input_line[3];
+  static byte input_pos = 0;
 
   if (Serial.available()) {
-    char c = Serial.read();
+    char ch = Serial.read();
 
-    if (c >= '0' && c <= '9') {
-      if (pos < 2) input_buf[pos++] = c;
+    if (ch >= '0' && ch <= '9') {
+      if (input_pos < 2) input_line[input_pos++] = ch;
     }
 
-    if (pos == 2 || c == '\n') {
-      input_buf[pos] = 0;
-      int val = atoi(input_buf);
+    if (input_pos == 2 || ch == '\n') {
+      input_line[input_pos] = 0;
+      int num = atoi(input_line);
 
-      if (val >= 0 && val <= 99) {
+      if (num >= 0 && num <= 99) {
         cli();
 
-        if (!system_running) {
-          internal_counter = val;
-          system_running = true;
-          ms_counter = 999;
-          Serial.print(F("STARTED at: ")); Serial.println(val);
+        if (!is_active) {
+          timer_counter = num;
+          is_active = true;
+          tick_counter = 999;
+          Serial.print(F("ЗАПУСК со значением: ")); Serial.println(num);
         } else {
-          override_value = val;
-          Serial.print(F("OVERRIDE next frame with: ")); Serial.println(val);
+          next_value = num;
+          Serial.print(F("ПЕРЕОПРЕДЕЛЕНИЕ на следующем тике: ")); Serial.println(num);
         }
 
         sei();
       }
-      pos = 0;
+      input_pos = 0;
     }
   }
 }
 
-uint16_t encode_number(int number) {
-  int tens = number / 10;
-  int ones = number % 10;
+uint16_t build_segments(int number) {
+  int tens_digit = number / 10;
+  int ones_digit = number % 10;
 
-  uint16_t bits = 0;
+  uint16_t result = 0;
 
-  for(int i=7; i>=0; i--) {
-     if(digits[tens][i]) bits |= (1 << (8 + i));
+  for(int i = 7; i >= 0; i--) {
+     if(segment_patterns[tens_digit][i]) result |= (1 << (8 + i));
   }
 
-  for(int i=7; i>=0; i--) {
-     if(digits[ones][i]) bits |= (1 << i);
+  for(int i = 7; i >= 0; i--) {
+     if(segment_patterns[ones_digit][i]) result |= (1 << i);
   }
 
-  return bits;
+  return result;
 }
 
 ISR(TIMER1_COMPA_vect) {
-  ms_counter++;
+  tick_counter++;
 
-  if (ms_counter >= 1000) {
-    ms_counter = 0;
+  if (tick_counter >= 1000) {
+    tick_counter = 0;
 
-    if (system_running) {
-      int value_to_show;
+    if (is_active) {
+      int display_num;
 
-      if (override_value != -1) {
-        value_to_show = override_value;
-        override_value = -1;
-        internal_counter++;
+      if (next_value != -1) {
+        display_num = next_value;
+        next_value = -1;
+        timer_counter++;
       }
       else {
-        value_to_show = internal_counter;
-        internal_counter++;
+        display_num = timer_counter;
+        timer_counter++;
       }
 
-      if (internal_counter > 99) internal_counter = 0;
+      if (timer_counter > 99) timer_counter = 0;
 
-      shift_buffer = encode_number(value_to_show);
-      current_state = STATE_SHIFT;
-      bit_index = 15;
+      data_reg = build_segments(display_num);
+      machine_state = SENDING;
+      current_bit = 15;
     }
   }
-  switch (current_state) {
-    case STATE_SHIFT:
-      if ((shift_buffer >> bit_index) & 1) {
+  switch (machine_state) {
+    case SENDING:
+      if ((data_reg >> current_bit) & 1) {
         PORTD |= (1 << 7);
       } else {
         PORTD &= ~(1 << 7);
@@ -140,20 +140,20 @@ ISR(TIMER1_COMPA_vect) {
       PORTD |= (1 << 3);
       PORTD &= ~(1 << 3);
 
-      bit_index--;
-      if (bit_index < 0) {
-        current_state = STATE_LATCH;
+      current_bit--;
+      if (current_bit < 0) {
+        machine_state = UPDATING;
       }
       break;
 
-    case STATE_LATCH:
+    case UPDATING:
       PORTD |= (1 << 5);
       PORTD &= ~(1 << 5);
 
-      current_state = STATE_WAIT;
+      machine_state = IDLE;
       break;
 
-    case STATE_WAIT:
+    case IDLE:
       break;
   }
 }
